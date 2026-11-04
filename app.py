@@ -1,194 +1,32 @@
 
-import os, base64, json, requests
+# ============================================================
+# 1. 라이브러리 및 OpenAI 클라이언트 설정
+# ============================================================
+
+import os
+import base64
+import json
+import requests
 import streamlit as st
 from openai import OpenAI
 
-# OpenAI 클라이언트 생성
 client = OpenAI()
 
-# 페이지 설정
-st.set_page_config(page_title="음성 AI 서비스", page_icon="🤖", layout="wide")
-st.title("음성 인식 AI 서비스")
-st.write("음성으로 질문하시면 답변해 드립니다.")
 
-# 역할 지정
-sys_role = """
-당신은 다양한 업무를 처리하는 AI 서비스입니다.
-개인 비서처럼 친절하게 응대합니다.
-"""
-
-# 상태 초기화
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# 지시 영역
-with st.form("task_form"):
-    uploaded_file = st.file_uploader("텍스트 파일 업로드", type=["txt"])
-    audio_value = st.audio_input("무엇을 도와드릴까요?")
-    submit = st.form_submit_button("실행")
-
-# 버튼을 눌렀을 때만 실행
-if submit:
-    # 업로드 된 파일이 있으면 디코딩
-    text = ""
-    if uploaded_file is not None:
-        text = uploaded_file.read().decode("utf-8")
-
-    # 녹음이 없으면 녹음 요청
-    if audio_value is None:
-        st.warning("음성을 녹음해주세요.")
-        st.stop()
-
-    # 시스템 메세지
-    system_content = sys_role
-    if text:
-        system_content += f"\n\n다음 내용을 참고하세요:\n{text}"
-    input_messages = [{"role": "system", "content": system_content}]
-
-    # STT: 음성 → 텍스트
-    transcript = client.audio.transcriptions.create(
-        model="whisper-1",
-        file=("audio.wav", audio_value, "audio/wav"))
-
-    # 사용자 메시지
-    input_messages.append({"role": "user", "content": transcript.text})
-
-    # LLM 호출 및 응답 듣기
-    with st.spinner("답변을 준비하고 있습니다..."):
-        # LLM 호출
-        response = client.responses.create(
-            model="gpt-4o-mini",
-            input=input_messages
-        )
-        answer = response.output_text
-
-        # 응답 출력
-        st.subheader("AI 답변")
-        st.write(answer)
-
-    # ============================================================
-# 1. 공통 기능: 세션 상태 관리
+# ============================================================
+# 2. 페이지 설정
 # ============================================================
 
-# 기존 코드의 messages 초기화는 그대로 사용
-
-# 음성 인식 결과 저장
-if "transcript" not in st.session_state:
-    st.session_state.transcript = ""
-
-# AI 답변 저장
-if "answer" not in st.session_state:
-    st.session_state.answer = ""
-
-# 업로드한 텍스트 저장
-if "meeting_text" not in st.session_state:
-    st.session_state.meeting_text = ""
-
-# 회의록 요약 결과 저장
-if "meeting_summary" not in st.session_state:
-    st.session_state.meeting_summary = ""
-
-    
-# ============================================================
-# 2. 공통 기능: 기본 질문과 응답 (LLM)
-# ============================================================
-
-def ask_ai(question, text=""):
-
-    # 기존 코드의 시스템 메시지 구성 방식 사용
-    system_content = sys_role
-
-    if text:
-        system_content += f"\n\n다음 내용을 참고하세요:\n{text}"
-
-    input_messages = [
-        {"role": "system", "content": system_content}
-    ]
-
-    input_messages.append({
-        "role": "user",
-        "content": question
-    })
-
-    # 기존 코드와 동일한 LLM 호출
-    response = client.responses.create(
-        model="gpt-4o-mini",
-        input=input_messages
-    )
-
-    answer = response.output_text
-
-    return answer
+st.set_page_config(
+    page_title="에이블 | AI 업무 비서",
+    page_icon="✦",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 
 # ============================================================
-# 3. 공통 기능: 텍스트 파일 읽기
-# ============================================================
-
-def read_text_file(uploaded_file):
-
-    text = ""
-
-    # 기존 코드의 디코딩 방식 사용
-    if uploaded_file is not None:
-        text = uploaded_file.getvalue().decode("utf-8")
-
-    return text
-
-
-# ============================================================
-# 4. 공통 기능: 음성 인식 (STT)
-# ============================================================
-
-def speech_to_text(audio_value):
-
-    if audio_value is None:
-        return ""
-
-    # 기존 코드와 동일한 Whisper 모델 사용
-    transcript = client.audio.transcriptions.create(
-        model="whisper-1",
-        file=(
-            "audio.wav",
-            audio_value.getvalue(),
-            "audio/wav"
-        )
-    )
-
-    return transcript.text
-
-
-# ============================================================
-# 5. 공통 기능: AI 답변 출력
-# ============================================================
-
-def display_ai_answer(answer):
-
-    # 기존 Streamlit 출력 방식 사용
-    st.subheader("AI 답변")
-    st.write(answer)
-
-
-# ============================================================
-# 6. 공통 기능: 대화 기록 관리
-# ============================================================
-
-def save_chat_history(question, answer):
-
-    # 기존 코드의 messages 세션 상태 활용
-    st.session_state.messages.append({
-        "role": "user",
-        "content": question
-    })
-
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": answer
-    })
-
-
-# ============================================================
-# 1. 기업용 UI 스타일 설정
+# 3. 기업용 UI 스타일 설정
 # ============================================================
 
 st.markdown("""
@@ -199,7 +37,7 @@ st.markdown("""
         color: #172B4D;
     }
 
-    /* 메인 화면 */
+    /* 메인 콘텐츠 */
     .block-container {
         padding-top: 2rem;
         padding-bottom: 1.5rem;
@@ -241,38 +79,152 @@ st.markdown("""
 
 
 # ============================================================
-# 2. 공통 세션 상태 초기화
+# 4. AI 역할(System Prompt) 설정
 # ============================================================
 
+sys_role = """
+당신은 '에이블(AIVLE)'이라는 이름의 AI 업무 비서입니다.
+
+다양한 업무를 처리하는 AI 서비스이며,
+회사원들의 업무 효율성을 높이는 것을 목표로 합니다.
+
+사용자의 질문에 친절하고 정확하게 답변합니다.
+
+업로드된 문서가 있다면 해당 내용을 참고하여 답변합니다.
+문서에 없는 정보는 임의로 만들어내지 않습니다.
+
+답변은 명확하고 전문적인 비즈니스 언어로 작성합니다.
+"""
+
+
+# ============================================================
+# 5. 공통 기능: 세션 상태 관리
+# ============================================================
+
+# 대화 기록
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# AI 답변
 if "answer" not in st.session_state:
     st.session_state.answer = ""
 
+# 음성 인식 결과
 if "transcript" not in st.session_state:
     st.session_state.transcript = ""
 
+# 업로드한 문서
 if "meeting_text" not in st.session_state:
     st.session_state.meeting_text = ""
 
+# 회의록 요약 결과
 if "meeting_summary" not in st.session_state:
     st.session_state.meeting_summary = ""
 
 
 # ============================================================
-# 3. 사이드바: 기능 선택
+# 6. 공통 기능: 기본 질문과 응답 (LLM)
+# ============================================================
+
+def ask_ai(question, text=""):
+
+    system_content = sys_role
+
+    if text:
+        system_content += f"\n\n다음 내용을 참고하세요:\n{text}"
+
+    input_messages = [
+        {"role": "system", "content": system_content}
+    ]
+
+    input_messages.append({
+        "role": "user",
+        "content": question
+    })
+
+    response = client.responses.create(
+        model="gpt-4o-mini",
+        input=input_messages
+    )
+
+    return response.output_text
+
+
+# ============================================================
+# 7. 공통 기능: 텍스트 파일 읽기
+# ============================================================
+
+def read_text_file(uploaded_file):
+
+    if uploaded_file is None:
+        return ""
+
+    return uploaded_file.getvalue().decode("utf-8-sig")
+
+
+# ============================================================
+# 8. 공통 기능: 음성 인식 (STT)
+# ============================================================
+
+def speech_to_text(audio_value):
+
+    if audio_value is None:
+        return ""
+
+    transcript = client.audio.transcriptions.create(
+        model="whisper-1",
+        file=(
+            "audio.wav",
+            audio_value.getvalue(),
+            "audio/wav"
+        )
+    )
+
+    return transcript.text
+
+
+# ============================================================
+# 9. 공통 기능: AI 답변 출력
+# ============================================================
+
+def display_ai_answer(answer):
+
+    st.subheader("AI 답변")
+    st.write(answer)
+
+
+# ============================================================
+# 10. 공통 기능: 대화 기록 저장
+# ============================================================
+
+def save_chat_history(question, answer):
+
+    st.session_state.messages.append({
+        "role": "user",
+        "content": question
+    })
+
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": answer
+    })
+
+
+# ============================================================
+# 11. 사이드바: 서비스명 및 기능 선택
 # ============================================================
 
 with st.sidebar:
 
-    st.markdown("## WORKSPACE AI")
-    st.caption("Enterprise AI Assistant")
+    # 서비스명
+    st.markdown("## ✦ 에이블")
+    st.caption("AIVLE | Enterprise AI Assistant")
 
     st.divider()
 
     st.markdown("##### WORKSPACE")
 
+    # 기능 선택
     selected_menu = st.radio(
         "기능 선택",
         [
@@ -291,15 +243,21 @@ with st.sidebar:
 
 
 # ============================================================
-# 4. 메인 화면: AI 채팅
+# 12. 메인 화면: AI 채팅
 # ============================================================
 
 if selected_menu == "AI 채팅":
 
-    st.title("AI 채팅")
+    st.title("✦ AI 채팅")
     st.caption("업무에 필요한 질문을 입력하고 AI의 도움을 받으세요.")
 
     st.divider()
+
+    # 첫 방문 안내
+    if not st.session_state.messages:
+        with st.container(border=True):
+            st.markdown("#### 에이블 AI")
+            st.write("안녕하세요. 오늘 어떤 업무를 도와드릴까요?")
 
     # 기존 대화 표시
     for message in st.session_state.messages:
@@ -307,16 +265,14 @@ if selected_menu == "AI 채팅":
         with st.chat_message(message["role"]):
             st.write(message["content"])
 
-    # 채팅 입력
+    # 사용자 입력
     question = st.chat_input("업무 관련 질문을 입력하세요.")
 
     if question:
 
-        # 사용자 질문 표시
         with st.chat_message("user"):
             st.write(question)
 
-        # AI 답변
         with st.chat_message("assistant"):
 
             with st.spinner("답변을 생성하고 있습니다..."):
@@ -326,7 +282,6 @@ if selected_menu == "AI 채팅":
 
                     st.write(answer)
 
-                    # 세션에 저장
                     st.session_state.answer = answer
                     save_chat_history(question, answer)
 
@@ -335,12 +290,12 @@ if selected_menu == "AI 채팅":
 
 
 # ============================================================
-# 5. 메인 화면: 음성 AI
+# 13. 메인 화면: 음성 AI
 # ============================================================
 
 elif selected_menu == "음성 AI":
 
-    st.title("음성 AI")
+    st.title("🎙️ 음성 AI")
     st.caption("음성으로 질문하고 AI의 답변을 확인하세요.")
 
     st.divider()
@@ -368,18 +323,18 @@ elif selected_menu == "음성 AI":
 
         else:
             try:
-                # STT
+                # 13-1. 음성 인식
                 with st.spinner("음성을 인식하고 있습니다..."):
                     question = speech_to_text(voice_audio)
 
                 st.session_state.transcript = question
 
-                # 인식 결과
+                # 13-2. 음성 인식 결과
                 with st.container(border=True):
                     st.subheader("음성 인식 결과")
                     st.write(question)
 
-                # AI 응답
+                # 13-3. AI 답변
                 if question.strip():
 
                     with st.spinner("답변을 생성하고 있습니다..."):
@@ -389,8 +344,7 @@ elif selected_menu == "음성 AI":
                     save_chat_history(question, answer)
 
                     with st.container(border=True):
-                        st.subheader("AI 답변")
-                        st.write(answer)
+                        display_ai_answer(answer)
 
                 else:
                     st.warning("음성을 인식하지 못했습니다.")
@@ -400,12 +354,12 @@ elif selected_menu == "음성 AI":
 
 
 # ============================================================
-# 6. 메인 화면: 문서 분석
+# 14. 메인 화면: 문서 분석
 # ============================================================
 
 elif selected_menu == "문서 분석":
 
-    st.title("문서 분석")
+    st.title("📄 문서 분석")
     st.caption("업무 문서를 업로드하고 관련 내용을 질문하세요.")
 
     st.divider()
@@ -442,12 +396,12 @@ elif selected_menu == "문서 분석":
 
         else:
             try:
-                # 문서 읽기
+                # 14-1. 문서 읽기
                 document_text = read_text_file(document_file)
 
                 st.session_state.meeting_text = document_text
 
-                # LLM 호출
+                # 14-2. LLM 호출
                 with st.spinner("문서를 분석하고 있습니다..."):
 
                     answer = ask_ai(
@@ -458,7 +412,7 @@ elif selected_menu == "문서 분석":
                 st.session_state.answer = answer
                 save_chat_history(document_question, answer)
 
-                # 결과 표시
+                # 14-3. 분석 결과
                 with st.container(border=True):
 
                     st.subheader("분석 결과")
@@ -469,12 +423,12 @@ elif selected_menu == "문서 분석":
 
 
 # ============================================================
-# 7. 메인 화면: 대화 기록
+# 15. 메인 화면: 대화 기록
 # ============================================================
 
 elif selected_menu == "대화 기록":
 
-    st.title("대화 기록")
+    st.title("🕘 대화 기록")
     st.caption("현재 세션에서 진행한 AI 대화를 확인하세요.")
 
     st.divider()
@@ -488,6 +442,7 @@ elif selected_menu == "대화 기록":
 
         st.divider()
 
+        # 대화 기록 초기화
         if st.button(
             "대화 기록 초기화",
             use_container_width=True
@@ -499,3 +454,28 @@ elif selected_menu == "대화 기록":
 
     else:
         st.info("아직 저장된 대화 기록이 없습니다.")
+
+
+# ============================================================
+# 16. 추가 기능 연결 영역
+# ============================================================
+
+# 앞으로 별도 .py 파일에서 구현한 기능을 연결합니다.
+
+# 16-1. 이메일 발송
+# from email_service import send_email
+
+# 16-2. 회의록 요약
+# from meeting_service import summarize_meeting
+
+# 16-3. 음성 요청 기반 회의록 요약
+# speech_to_text() + summarize_meeting()
+
+# 16-4. 텍스트 → 음성 변환 (TTS)
+# from audio_service import text_to_speech
+
+# 16-5. Function Calling
+# from tools import execute_tool
+
+# 16-6. 캘린더 일정 관리
+# from calendar_service import create_event
