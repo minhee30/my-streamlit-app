@@ -209,3 +209,194 @@ def save_chat_history(question, answer):
 
 # 7-6. Function Calling
 # 개별 기능 구현 파일 확인 후 연결
+
+
+# ============================================================
+# 8. 공통 기능 사용자 인터페이스 (Streamlit)
+# ============================================================
+
+st.divider()
+st.title("🤖 AI 개인비서 - 공통 기능")
+
+# 기능별 탭 생성
+tab1, tab2, tab3 = st.tabs([
+    "💬 AI 채팅",
+    "🎤 음성 AI",
+    "📄 문서 기반 질문"
+])
+
+
+# ============================================================
+# 8-1. 기본 질문과 응답 UI
+# ============================================================
+
+with tab1:
+
+    st.subheader("💬 AI 채팅")
+    st.write("질문을 입력하면 AI가 답변합니다.")
+
+    with st.form("chat_form"):
+
+        question = st.text_area(
+            "질문을 입력하세요.",
+            key="chat_question"
+        )
+
+        chat_submit = st.form_submit_button("질문하기")
+
+    if chat_submit:
+
+        if not question.strip():
+            st.warning("질문을 입력해주세요.")
+
+        else:
+            with st.spinner("AI 답변을 생성하고 있습니다..."):
+
+                try:
+                    answer = ask_ai(question)
+
+                    # 답변 및 대화 기록 저장
+                    st.session_state.answer = answer
+                    save_chat_history(question, answer)
+
+                    # 답변 출력
+                    display_ai_answer(answer)
+
+                except Exception as e:
+                    st.error(f"AI 응답 오류: {e}")
+
+
+# ============================================================
+# 8-2. 음성 인식 및 AI 답변 UI
+# ============================================================
+
+with tab2:
+
+    st.subheader("🎤 음성 AI")
+    st.write("음성을 녹음하면 텍스트로 변환하고 답변합니다.")
+
+    with st.form("voice_form"):
+
+        voice_audio = st.audio_input(
+            "음성을 녹음해주세요.",
+            key="voice_audio_input"
+        )
+
+        voice_submit = st.form_submit_button("음성 질문하기")
+
+    if voice_submit:
+
+        if voice_audio is None:
+            st.warning("음성을 먼저 녹음해주세요.")
+
+        else:
+            try:
+                # 1. 음성 인식
+                with st.spinner("음성을 인식하고 있습니다..."):
+                    question = speech_to_text(voice_audio)
+
+                    st.session_state.transcript = question
+
+                # 2. 음성 인식 결과 출력
+                st.subheader("음성 인식 결과")
+                st.write(question)
+
+                # 3. AI 답변 생성
+                if question.strip():
+
+                    with st.spinner("AI 답변을 생성하고 있습니다..."):
+                        answer = ask_ai(question)
+
+                        st.session_state.answer = answer
+                        save_chat_history(question, answer)
+
+                    # 4. AI 답변 출력
+                    display_ai_answer(answer)
+
+                else:
+                    st.warning("음성에서 텍스트를 인식하지 못했습니다.")
+
+            except Exception as e:
+                st.error(f"음성 처리 오류: {e}")
+
+
+# ============================================================
+# 8-3. 문서 기반 질문과 응답 UI
+# ============================================================
+
+with tab3:
+
+    st.subheader("📄 문서 기반 질문")
+    st.write("텍스트 파일을 업로드하고 내용을 질문하세요.")
+
+    with st.form("document_form"):
+
+        document_file = st.file_uploader(
+            "텍스트 파일 업로드",
+            type=["txt"],
+            key="document_file_input"
+        )
+
+        document_question = st.text_area(
+            "문서에 대해 질문하세요.",
+            key="document_question"
+        )
+
+        document_submit = st.form_submit_button("문서 질문하기")
+
+    if document_submit:
+
+        if document_file is None:
+            st.warning("텍스트 파일을 업로드해주세요.")
+
+        elif not document_question.strip():
+            st.warning("질문을 입력해주세요.")
+
+        else:
+            try:
+                # 1. 텍스트 파일 읽기
+                document_text = read_text_file(document_file)
+
+                st.session_state.meeting_text = document_text
+
+                # 2. 문서를 참고하여 AI 답변 생성
+                with st.spinner("문서를 분석하고 있습니다..."):
+
+                    answer = ask_ai(
+                        question=document_question,
+                        text=document_text
+                    )
+
+                    st.session_state.answer = answer
+                    save_chat_history(document_question, answer)
+
+                # 3. AI 답변 출력
+                display_ai_answer(answer)
+
+            except Exception as e:
+                st.error(f"문서 처리 오류: {e}")
+
+
+# ============================================================
+# 9. 대화 기록 확인 UI
+# ============================================================
+
+st.divider()
+
+with st.expander("📜 대화 기록 보기"):
+
+    if st.session_state.messages:
+
+        for message in st.session_state.messages:
+
+            if message["role"] == "user":
+                st.markdown(f"**사용자:** {message['content']}")
+
+            elif message["role"] == "assistant":
+                st.markdown(f"**AI:** {message['content']}")
+
+            st.divider()
+
+    else:
+        st.info("아직 대화 기록이 없습니다.")
+
