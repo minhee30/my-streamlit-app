@@ -273,6 +273,11 @@ elif selected_menu == "📝 회의록 요약":
                 "담당 업무를 확인할 직원 이름 (선택)"
             )
 
+            meeting_date = st.date_input(
+                "회의 날짜",
+                value=None
+            )
+
             meeting_file = st.file_uploader(
                 "회의록 TXT 업로드",
                 type=["txt"]
@@ -315,8 +320,9 @@ elif selected_menu == "📝 회의록 요약":
                 with st.spinner("회의록을 요약하고 있습니다..."):
                     summary = summarize_meeting(
                         meeting_text,
-                        employee_name=employee_name
-                    )
+                        employee_name=employee_name or "김 대리",
+                        meeting_date=meeting_date.isoformat() if meeting_date else None
+                        )
 
                     # 음성 요청에서 추가 지시가 있다면 반영
                     if instruction.strip():
