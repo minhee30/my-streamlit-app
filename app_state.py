@@ -31,34 +31,33 @@ def initialize_state() -> None:
         st.session_state.calendar_month = korea_today().month
     if "meeting_summary" not in st.session_state:
         st.session_state.meeting_summary = ""
-    if "meeting_messages" not in st.session_state:
-        st.session_state.meeting_messages = []
     if "meeting_questions" not in st.session_state:
         st.session_state.meeting_questions = []
+    if "meeting_followup_history" not in st.session_state:
+        st.session_state.meeting_followup_history = []
+    if "meeting_followup_file_key" not in st.session_state:
+        st.session_state.meeting_followup_file_key = None
     if "analyzed_files" not in st.session_state:
         st.session_state.analyzed_files = set()
 
 
 def reset_state() -> None:
-    clear_chat_history()
+    st.session_state.messages.clear()
     st.session_state.meeting_content = ""
     st.session_state.meeting_file_id = None
+    st.session_state.audio_bytes = None
     st.session_state.upload_version += 1
     st.session_state.schedules.clear()
     st.session_state.todos.clear()
     st.session_state.meeting_summary = ""
     st.session_state.meeting_questions = []
-    st.session_state.meeting_messages = []
     st.session_state.analyzed_files.clear()
+    st.session_state.meeting_followup_history = []
+    st.session_state.meeting_followup_file_key = None
     today = korea_today()
     st.session_state.selected_date = today
     st.session_state.calendar_year = today.year
     st.session_state.calendar_month = today.month
-
-
-def clear_chat_history() -> None:
-    st.session_state.messages.clear()
-    st.session_state.audio_bytes = None
 
 
 def save_response(user_prompt: str, answer: str, audio_bytes: bytes | None) -> None:

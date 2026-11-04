@@ -5,8 +5,6 @@ import streamlit as st
 
 def update_meeting_file(uploaded_file) -> str:
     if uploaded_file is None:
-        if st.session_state.meeting_content:
-            st.session_state.meeting_messages = []
         st.session_state.meeting_content = ""
         st.session_state.meeting_file_id = None
         return ""
@@ -19,8 +17,6 @@ def update_meeting_file(uploaded_file) -> str:
             st.session_state.meeting_content = ""
             st.session_state.meeting_file_id = None
             raise
-        if content != st.session_state.meeting_content:
-            st.session_state.meeting_messages = []
         st.session_state.meeting_content = content
         st.session_state.meeting_file_id = file_id
     return st.session_state.meeting_content
