@@ -138,5 +138,3 @@ def summarize_meeting(
             {"role": "user", "content": prompt}
         ]
     )
-
-    return response.output_text
