@@ -3,7 +3,6 @@ import streamlit as st
 
 from assistant import ask_ai, summarize_meeting
 from audio_utils import speech_to_text, text_to_speech
-from email_utils import send_email
 
 
 # ============================================================
@@ -76,14 +75,20 @@ if "meeting_text" not in st.session_state:
 if "meeting_summary" not in st.session_state:
     st.session_state.meeting_summary = ""
 
+if "meeting_audio_bytes" not in st.session_state:
+    st.session_state.meeting_audio_bytes = None
+
 
 def read_text_file(uploaded_file):
+    """TXT 파일 읽기"""
     if uploaded_file is None:
         return ""
+
     return uploaded_file.getvalue().decode("utf-8-sig")
 
 
 def save_chat_history(question, answer):
+    """현재 세션의 대화 기록 저장"""
     st.session_state.messages.extend([
         {"role": "user", "content": question},
         {"role": "assistant", "content": answer}
@@ -108,7 +113,6 @@ with st.sidebar:
             "🎙️ 음성 AI",
             "📄 문서 분석",
             "📝 회의록 요약",
-            "✉️ 이메일 발송",
             "🕘 대화 기록"
         ],
         label_visibility="collapsed"
@@ -146,9 +150,13 @@ if selected_menu == "✦ AI 채팅":
         with st.chat_message("assistant"):
             try:
                 with st.spinner("답변을 생성하고 있습니다..."):
-                    answer = answer = ask_ai(question=question,history=st.session_state.messages)
+                    answer = ask_ai(
+                        question=question,
+                        history=st.session_state.messages
+                    )
 
                 st.write(answer)
+
                 st.session_state.answer = answer
                 save_chat_history(question, answer)
 
@@ -169,6 +177,7 @@ elif selected_menu == "🎙️ 음성 AI":
     with st.container(border=True):
         with st.form("voice_form"):
             voice_audio = st.audio_input("음성을 녹음해주세요.")
+
             voice_submit = st.form_submit_button(
                 "음성 분석 시작",
                 use_container_width=True
@@ -177,6 +186,7 @@ elif selected_menu == "🎙️ 음성 AI":
     if voice_submit:
         if voice_audio is None:
             st.warning("음성을 먼저 녹음해주세요.")
+
         else:
             try:
                 with st.spinner("음성을 인식하고 있습니다..."):
@@ -190,7 +200,10 @@ elif selected_menu == "🎙️ 음성 AI":
 
                 if question.strip():
                     with st.spinner("답변을 생성하고 있습니다..."):
-                        answer = ask_ai(question)
+                        answer = ask_ai(
+                            question=question,
+                            history=st.session_state.messages
+                        )
 
                     st.session_state.answer = answer
                     save_chat_history(question, answer)
@@ -198,6 +211,7 @@ elif selected_menu == "🎙️ 음성 AI":
                     with st.container(border=True):
                         st.subheader("AI 답변")
                         st.write(answer)
+
                 else:
                     st.warning("음성을 인식하지 못했습니다.")
 
@@ -217,14 +231,17 @@ elif selected_menu == "📄 문서 분석":
 
     with st.container(border=True):
         with st.form("document_form"):
+
             document_file = st.file_uploader(
                 "문서 업로드",
                 type=["txt"]
             )
+
             document_question = st.text_area(
                 "질문 입력",
                 placeholder="예: 이 문서의 핵심 내용을 요약해줘."
             )
+
             document_submit = st.form_submit_button(
                 "문서 분석 시작",
                 use_container_width=True
@@ -233,16 +250,17 @@ elif selected_menu == "📄 문서 분석":
     if document_submit:
         if document_file is None:
             st.warning("문서를 업로드해주세요.")
+
         elif not document_question.strip():
             st.warning("질문을 입력해주세요.")
+
         else:
             try:
                 document_text = read_text_file(document_file)
-                st.session_state.meeting_text = document_text
 
                 with st.spinner("문서를 분석하고 있습니다..."):
                     answer = ask_ai(
-                        document_question,
+                        question=document_question,
                         text=document_text
                     )
 
@@ -269,8 +287,10 @@ elif selected_menu == "📝 회의록 요약":
 
     with st.container(border=True):
         with st.form("meeting_form"):
+
             employee_name = st.text_input(
-                "담당 업무를 확인할 직원 이름 (선택)"
+                "담당 업무를 확인할 직원 이름 (선택)",
+                placeholder="예: 김 대리"
             )
 
             meeting_date = st.date_input(
@@ -289,7 +309,7 @@ elif selected_menu == "📝 회의록 요약":
             )
 
             meeting_audio = st.audio_input(
-                "또는 음성으로 요약을 요청하세요."
+                "또는 음성으로 추가 요청하세요."
             )
 
             meeting_submit = st.form_submit_button(
@@ -298,127 +318,113 @@ elif selected_menu == "📝 회의록 요약":
             )
 
     if meeting_submit:
+
+        # 새로운 분석 시작 시 이전 결과 초기화
+        st.session_state.meeting_summary = ""
+        st.session_state.meeting_audio_bytes = None
+
         try:
             meeting_text = meeting_input.strip()
 
+            # TXT 파일을 업로드했다면 파일 내용 사용
             if meeting_file is not None:
                 meeting_text = read_text_file(meeting_file)
 
-            if not meeting_text:
-                st.warning("회의 내용을 입력하거나 파일을 업로드해주세요.")
+            if not meeting_text.strip():
+                st.warning(
+                    "회의 내용을 입력하거나 파일을 업로드해주세요."
+                )
+
             else:
                 st.session_state.meeting_text = meeting_text
 
                 instruction = ""
 
+                # 음성 추가 요청 인식
                 if meeting_audio is not None:
                     with st.spinner("음성 요청을 인식하고 있습니다..."):
                         instruction = speech_to_text(meeting_audio)
 
-                    st.info(f"음성 요청: {instruction}")
+                    if instruction.strip():
+                        st.info(f"음성 요청: {instruction}")
 
+                # 회의록 요약 실행
                 with st.spinner("회의록을 요약하고 있습니다..."):
-                    summary = summarize_meeting(
-                        meeting_text,
-                        employee_name=employee_name or "김 대리",
-                        meeting_date=meeting_date.isoformat() if meeting_date else None
-                        )
 
-                    # 음성 요청에서 추가 지시가 있다면 반영
+                    summary = summarize_meeting(
+                        meeting_text=meeting_text,
+                        employee_name=employee_name.strip() or "김 대리",
+                        meeting_date=(
+                            meeting_date.isoformat()
+                            if meeting_date else None
+                        )
+                    )
+
+                    # 음성으로 추가 요청한 경우 결과 재정리
                     if instruction.strip():
                         summary = ask_ai(
                             question=(
-                                f"다음 회의록 요약에 대해 사용자의 요청을 "
-                                f"반영해 다시 정리하세요.\n"
-                                f"요청: {instruction}"
+                                "다음 회의록 요약에 사용자의 추가 요청을 "
+                                "반영해 다시 정리하세요.\n"
+                                f"추가 요청: {instruction}\n"
+                                "기존 회의록에 없는 사실은 만들지 마세요."
                             ),
                             text=summary
                         )
+
+                # 요약 결과 검증
+                if not summary or not summary.strip():
+                    raise RuntimeError(
+                        "회의록 요약 결과가 비어 있습니다."
+                    )
 
                 st.session_state.meeting_summary = summary
 
         except Exception as e:
             st.error(f"회의록 처리 오류: {e}")
 
+    # 요약 결과 출력
     if st.session_state.meeting_summary:
+
         with st.container(border=True):
             st.subheader("회의록 요약 결과")
-            st.write(st.session_state.meeting_summary)
+
+            st.markdown(st.session_state.meeting_summary)
 
             st.download_button(
                 "요약 결과 다운로드",
                 data=st.session_state.meeting_summary,
                 file_name="meeting_summary.txt",
-                mime="text/plain"
+                mime="text/plain",
+                use_container_width=True
             )
 
-        if st.button("🔊 요약 내용 음성으로 듣기"):
+        # TTS 생성
+        if st.button(
+            "🔊 요약 내용 음성으로 듣기",
+            use_container_width=True
+        ):
             try:
                 with st.spinner("음성을 생성하고 있습니다..."):
                     audio_bytes = text_to_speech(
                         st.session_state.meeting_summary
                     )
 
-                st.audio(audio_bytes, format="audio/mp3")
+                st.session_state.meeting_audio_bytes = audio_bytes
 
             except Exception as e:
                 st.error(f"TTS 오류: {e}")
 
-
-# ============================================================
-# 9. 이메일 발송
-# ============================================================
-
-elif selected_menu == "✉️ 이메일 발송":
-
-    st.title("✉️ 이메일 발송")
-    st.caption("수신자와 내용을 확인한 뒤 이메일을 발송하세요.")
-    st.divider()
-
-    with st.container(border=True):
-        with st.form("email_form"):
-            email_to = st.text_input(
-                "받는 사람",
-                placeholder="example@company.com"
+        # Streamlit 재실행 후에도 음성 유지
+        if st.session_state.meeting_audio_bytes is not None:
+            st.audio(
+                st.session_state.meeting_audio_bytes,
+                format="audio/mp3"
             )
-
-            email_subject = st.text_input("제목")
-
-            email_body = st.text_area(
-                "본문",
-                height=220
-            )
-
-            email_submit = st.form_submit_button(
-                "이메일 발송",
-                use_container_width=True
-            )
-
-    if email_submit:
-        if not all([
-            email_to.strip(),
-            email_subject.strip(),
-            email_body.strip()
-        ]):
-            st.warning("수신자, 제목, 본문을 모두 입력해주세요.")
-        else:
-            with st.spinner("이메일을 발송하고 있습니다..."):
-                result = send_email(
-                    email_to.strip(),
-                    email_subject,
-                    email_body
-                )
-
-            if result["status"] == "success":
-                st.success("이메일이 발송되었습니다.")
-            else:
-                st.error(
-                    f"이메일 발송 실패: {result.get('error', '알 수 없는 오류')}"
-                )
 
 
 # ============================================================
-# 10. 대화 기록
+# 9. 대화 기록
 # ============================================================
 
 elif selected_menu == "🕘 대화 기록":
@@ -428,6 +434,7 @@ elif selected_menu == "🕘 대화 기록":
     st.divider()
 
     if st.session_state.messages:
+
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.write(message["content"])
@@ -440,5 +447,6 @@ elif selected_menu == "🕘 대화 기록":
             st.session_state.answer = ""
             st.session_state.transcript = ""
             st.rerun()
+
     else:
         st.info("아직 저장된 대화 기록이 없습니다.")
