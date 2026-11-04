@@ -146,7 +146,7 @@ if selected_menu == "✦ AI 채팅":
         with st.chat_message("assistant"):
             try:
                 with st.spinner("답변을 생성하고 있습니다..."):
-                    answer = ask_ai(question)
+                    answer = answer = ask_ai(question=question,history=st.session_state.messages)
 
                 st.write(answer)
                 st.session_state.answer = answer

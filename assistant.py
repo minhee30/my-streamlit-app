@@ -11,23 +11,42 @@ SYSTEM_ROLE = """
 """
 
 
-def ask_ai(question, text=""):
-    """일반 질문 또는 문서 기반 질문"""
+def ask_ai(question, text="", history=None):
+    """
+    멀티턴 대화 지원
+    - question: 현재 질문
+    - text: 참고 문서
+    - history: 이전 대화 기록
+    """
 
     system_content = SYSTEM_ROLE
 
     if text:
         system_content += f"\n\n참고 문서:\n{text}"
 
+    input_messages = [
+        {"role": "system", "content": system_content}
+    ]
+
+    # 이전 대화 기록 추가
+    if history:
+        input_messages.extend(history)
+
+    # 현재 질문 추가
+    input_messages.append({
+        "role": "user",
+        "content": question
+    })
+
     response = client.responses.create(
         model="gpt-4o-mini",
-        input=[
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": question}
-        ]
+        input=input_messages
     )
 
     return response.output_text
+
+    return response.output_text
+
 
 
 def summarize_meeting(meeting_text, employee_name=""):
