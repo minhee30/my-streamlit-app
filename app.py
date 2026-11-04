@@ -1,452 +1,73 @@
-
+"""AI 개인비서 에이블의 Streamlit 화면."""
+import hashlib
 import streamlit as st
+from openai import OpenAI
+from app_state import initialize_state, reset_state
+from assistant import DEFAULT_SYS_ROLE
+from calendar_ui import render_calendar, render_todos
+from chat_ui import render_chat
+from meeting_planner import analyze_meeting, save_analysis
+from meeting_utils import update_meeting_file
 
-from assistant import ask_ai, summarize_meeting
-from audio_utils import speech_to_text, text_to_speech
-
-
-# ============================================================
-# 1. 페이지 설정
-# ============================================================
-
-st.set_page_config(
-    page_title="에이블 | AI 업무 비서",
-    page_icon="✦",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-
-# ============================================================
-# 2. 기업용 디자인
-# ============================================================
-
-st.markdown("""
-<style>
-    .stApp {
-        background-color: #F8FAFC;
-    }
-
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        max-width: 1100px;
-    }
-
-    [data-testid="stSidebar"] {
-        background-color: #F1F5F9;
-        border-right: 1px solid #E2E8F0;
-    }
-
-    h1, h2, h3 {
-        color: #172B4D;
-        letter-spacing: -0.5px;
-    }
-
-    .stButton > button,
-    .stFormSubmitButton > button {
-        border-radius: 8px;
-        font-weight: 600;
-    }
-
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        border-radius: 12px;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-
-# ============================================================
-# 3. 공통 상태 및 보조 함수
-# ============================================================
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "transcript" not in st.session_state:
-    st.session_state.transcript = ""
-
-if "answer" not in st.session_state:
-    st.session_state.answer = ""
-
-if "meeting_text" not in st.session_state:
-    st.session_state.meeting_text = ""
-
-if "meeting_summary" not in st.session_state:
-    st.session_state.meeting_summary = ""
-
-if "meeting_audio_bytes" not in st.session_state:
-    st.session_state.meeting_audio_bytes = None
-
-
-def read_text_file(uploaded_file):
-    """TXT 파일 읽기"""
-    if uploaded_file is None:
-        return ""
-
-    return uploaded_file.getvalue().decode("utf-8-sig")
-
-
-def save_chat_history(question, answer):
-    """현재 세션의 대화 기록 저장"""
-    st.session_state.messages.extend([
-        {"role": "user", "content": question},
-        {"role": "assistant", "content": answer}
-    ])
-
-
-# ============================================================
-# 4. 사이드바
-# ============================================================
+st.set_page_config(page_title="AI 개인비서 에이블", page_icon="🤖", layout="wide")
+initialize_state()
 
 with st.sidebar:
-    st.markdown("## ✦ 에이블")
-    st.caption("AIVLE | Enterprise AI Assistant")
-
-    st.divider()
-    st.markdown("##### WORKSPACE")
-
-    selected_menu = st.radio(
-        "기능 선택",
-        [
-            "✦ AI 채팅",
-            "🎙️ 음성 AI",
-            "📄 문서 분석",
-            "📝 회의록 요약",
-            "🕘 대화 기록"
-        ],
-        label_visibility="collapsed"
+    st.header("🤖 에이블")
+    st.subheader("📥 회의록과 명령")
+    uploaded_file = st.file_uploader(
+        "회의록 텍스트 파일 (.txt)", type=["txt"],
+        key=f"meeting_file_{st.session_state.upload_version}",
     )
+    try:
+        meeting_content = update_meeting_file(uploaded_file)
+    except UnicodeDecodeError:
+        meeting_content = ""
+        st.error("UTF-8 형식의 텍스트 파일을 업로드해 주세요.")
 
-    st.divider()
-    st.caption("AI 기반 업무 지원 서비스")
-
-
-# ============================================================
-# 5. AI 채팅
-# ============================================================
-
-if selected_menu == "✦ AI 채팅":
-
-    st.title("✦ AI 채팅")
-    st.caption("업무에 필요한 질문을 입력하고 AI의 도움을 받으세요.")
-    st.divider()
-
-    if not st.session_state.messages:
-        with st.container(border=True):
-            st.markdown("#### 에이블 AI")
-            st.write("안녕하세요. 오늘 어떤 업무를 도와드릴까요?")
-
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-
-    question = st.chat_input("업무 관련 질문을 입력하세요.")
-
-    if question:
-        with st.chat_message("user"):
-            st.write(question)
-
-        with st.chat_message("assistant"):
-            try:
-                with st.spinner("답변을 생성하고 있습니다..."):
-                    answer = ask_ai(
-                        question=question,
-                        history=st.session_state.messages
-                    )
-
-                st.write(answer)
-
-                st.session_state.answer = answer
-                save_chat_history(question, answer)
-
-            except Exception as e:
-                st.error(f"AI 응답 오류: {e}")
-
-
-# ============================================================
-# 6. 음성 AI
-# ============================================================
-
-elif selected_menu == "🎙️ 음성 AI":
-
-    st.title("🎙️ 음성 AI")
-    st.caption("음성으로 질문하고 AI 답변을 확인하세요.")
-    st.divider()
-
-    with st.container(border=True):
-        with st.form("voice_form"):
-            voice_audio = st.audio_input("음성을 녹음해주세요.")
-
-            voice_submit = st.form_submit_button(
-                "음성 분석 시작",
-                use_container_width=True
-            )
-
-    if voice_submit:
-        if voice_audio is None:
-            st.warning("음성을 먼저 녹음해주세요.")
-
-        else:
-            try:
-                with st.spinner("음성을 인식하고 있습니다..."):
-                    question = speech_to_text(voice_audio)
-
-                st.session_state.transcript = question
-
-                with st.container(border=True):
-                    st.subheader("음성 인식 결과")
-                    st.write(question)
-
-                if question.strip():
-                    with st.spinner("답변을 생성하고 있습니다..."):
-                        answer = ask_ai(
-                            question=question,
-                            history=st.session_state.messages
-                        )
-
-                    st.session_state.answer = answer
-                    save_chat_history(question, answer)
-
-                    with st.container(border=True):
-                        st.subheader("AI 답변")
-                        st.write(answer)
-
+    if uploaded_file is None:
+        st.info("회의록을 업로드하면 일정과 할 일을 분석합니다.")
+    elif meeting_content:
+        st.caption(f"업로드: {uploaded_file.name}")
+        with st.expander("회의록 본문 보기"):
+            st.text_area("미팅 본문", meeting_content, height=180, disabled=True)
+        file_key = hashlib.sha256(meeting_content.encode("utf-8")).hexdigest()
+        if file_key not in st.session_state.analyzed_files:
+            with st.spinner("회의록 분석 중입니다..."):
+                try:
+                    analysis = analyze_meeting(OpenAI(timeout=60.0), meeting_content)
+                    schedule_count, todo_count = save_analysis(analysis, file_key)
+                except Exception as exc:
+                    st.error(f"회의록 분석 오류: {exc}")
                 else:
-                    st.warning("음성을 인식하지 못했습니다.")
+                    st.success(f"앱 내 캘린더 {schedule_count}건, To-do {todo_count}건 등록")
 
-            except Exception as e:
-                st.error(f"음성 처리 오류: {e}")
-
-
-# ============================================================
-# 7. 문서 분석
-# ============================================================
-
-elif selected_menu == "📄 문서 분석":
-
-    st.title("📄 문서 분석")
-    st.caption("TXT 문서를 업로드하고 내용을 질문하세요.")
     st.divider()
+    with st.expander("에이블 페르소나 (프롬프트)"):
+        sys_role = st.text_area("시스템 역할", value=DEFAULT_SYS_ROLE, height=220)
+    if st.button("대화 및 일정 초기화", use_container_width=True):
+        reset_state()
+        st.rerun()
+    with st.form("voice_form"):
+        audio_query = st.audio_input("음성으로 질문하기")
+        voice_submitted = st.form_submit_button("음성 질문 보내기", use_container_width=True)
 
-    with st.container(border=True):
-        with st.form("document_form"):
-
-            document_file = st.file_uploader(
-                "문서 업로드",
-                type=["txt"]
-            )
-
-            document_question = st.text_area(
-                "질문 입력",
-                placeholder="예: 이 문서의 핵심 내용을 요약해줘."
-            )
-
-            document_submit = st.form_submit_button(
-                "문서 분석 시작",
-                use_container_width=True
-            )
-
-    if document_submit:
-        if document_file is None:
-            st.warning("문서를 업로드해주세요.")
-
-        elif not document_question.strip():
-            st.warning("질문을 입력해주세요.")
-
-        else:
-            try:
-                document_text = read_text_file(document_file)
-
-                with st.spinner("문서를 분석하고 있습니다..."):
-                    answer = ask_ai(
-                        question=document_question,
-                        text=document_text
-                    )
-
-                st.session_state.answer = answer
-                save_chat_history(document_question, answer)
-
-                with st.container(border=True):
-                    st.subheader("분석 결과")
-                    st.write(answer)
-
-            except Exception as e:
-                st.error(f"문서 분석 오류: {e}")
-
-
-# ============================================================
-# 8. 회의록 요약 및 TTS
-# ============================================================
-
-elif selected_menu == "📝 회의록 요약":
-
-    st.title("📝 회의록 요약")
-    st.caption("회의 내용을 분석하고 담당 업무를 정리합니다.")
-    st.divider()
-
-    with st.container(border=True):
-        with st.form("meeting_form"):
-
-            employee_name = st.text_input(
-                "담당 업무를 확인할 직원 이름 (선택)",
-                placeholder="예: 김 대리"
-            )
-
-            meeting_date = st.date_input(
-                "회의 날짜",
-                value=None
-            )
-
-            meeting_file = st.file_uploader(
-                "회의록 TXT 업로드",
-                type=["txt"]
-            )
-
-            meeting_input = st.text_area(
-                "회의 내용을 직접 입력할 수도 있습니다.",
-                height=160
-            )
-
-            meeting_audio = st.audio_input(
-                "또는 음성으로 추가 요청하세요."
-            )
-
-            meeting_submit = st.form_submit_button(
-                "회의록 요약 시작",
-                use_container_width=True
-            )
-
-    if meeting_submit:
-
-        # 새로운 분석 시작 시 이전 결과 초기화
-        st.session_state.meeting_summary = ""
-        st.session_state.meeting_audio_bytes = None
-
-        try:
-            meeting_text = meeting_input.strip()
-
-            # TXT 파일을 업로드했다면 파일 내용 사용
-            if meeting_file is not None:
-                meeting_text = read_text_file(meeting_file)
-
-            if not meeting_text.strip():
-                st.warning(
-                    "회의 내용을 입력하거나 파일을 업로드해주세요."
-                )
-
-            else:
-                st.session_state.meeting_text = meeting_text
-
-                instruction = ""
-
-                # 음성 추가 요청 인식
-                if meeting_audio is not None:
-                    with st.spinner("음성 요청을 인식하고 있습니다..."):
-                        instruction = speech_to_text(meeting_audio)
-
-                    if instruction.strip():
-                        st.info(f"음성 요청: {instruction}")
-
-                # 회의록 요약 실행
-                with st.spinner("회의록을 요약하고 있습니다..."):
-
-                    summary = summarize_meeting(
-                        meeting_text=meeting_text,
-                        employee_name=employee_name.strip() or "김 대리",
-                        meeting_date=(
-                            meeting_date.isoformat()
-                            if meeting_date else None
-                        )
-                    )
-
-                    # 음성으로 추가 요청한 경우 결과 재정리
-                    if instruction.strip():
-                        summary = ask_ai(
-                            question=(
-                                "다음 회의록 요약에 사용자의 추가 요청을 "
-                                "반영해 다시 정리하세요.\n"
-                                f"추가 요청: {instruction}\n"
-                                "기존 회의록에 없는 사실은 만들지 마세요."
-                            ),
-                            text=summary
-                        )
-
-                # 요약 결과 검증
-                if not summary or not summary.strip():
-                    raise RuntimeError(
-                        "회의록 요약 결과가 비어 있습니다."
-                    )
-
-                st.session_state.meeting_summary = summary
-
-        except Exception as e:
-            st.error(f"회의록 처리 오류: {e}")
-
-    # 요약 결과 출력
+st.title("📅 ABLE 일정 및 업무 관리")
+st.caption("회의록을 업로드한 뒤 요약을 확인하고 후속 질문을 이어갈 수 있습니다.")
+calendar_column, summary_column = st.columns([2.4, 1], gap="large")
+with calendar_column:
+    render_calendar()
+with summary_column:
+    st.subheader("📋 회의 요약")
     if st.session_state.meeting_summary:
-
-        with st.container(border=True):
-            st.subheader("회의록 요약 결과")
-
-            st.markdown(st.session_state.meeting_summary)
-
-            st.download_button(
-                "요약 결과 다운로드",
-                data=st.session_state.meeting_summary,
-                file_name="meeting_summary.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
-
-        # TTS 생성
-        if st.button(
-            "🔊 요약 내용 음성으로 듣기",
-            use_container_width=True
-        ):
-            try:
-                with st.spinner("음성을 생성하고 있습니다..."):
-                    audio_bytes = text_to_speech(
-                        st.session_state.meeting_summary
-                    )
-
-                st.session_state.meeting_audio_bytes = audio_bytes
-
-            except Exception as e:
-                st.error(f"TTS 오류: {e}")
-
-        # Streamlit 재실행 후에도 음성 유지
-        if st.session_state.meeting_audio_bytes is not None:
-            st.audio(
-                st.session_state.meeting_audio_bytes,
-                format="audio/mp3"
-            )
-
-
-# ============================================================
-# 9. 대화 기록
-# ============================================================
-
-elif selected_menu == "🕘 대화 기록":
-
-    st.title("🕘 대화 기록")
-    st.caption("현재 세션의 AI 대화를 확인하세요.")
-    st.divider()
-
-    if st.session_state.messages:
-
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.write(message["content"])
-
-        if st.button(
-            "대화 기록 초기화",
-            use_container_width=True
-        ):
-            st.session_state.messages = []
-            st.session_state.answer = ""
-            st.session_state.transcript = ""
-            st.rerun()
-
+        st.markdown(st.session_state.meeting_summary)
     else:
-        st.info("아직 저장된 대화 기록이 없습니다.")
+        st.info("회의록을 업로드하면 요약이 여기에 표시됩니다.")
+    if st.session_state.meeting_questions:
+        with st.expander("확인 필요한 항목"):
+            for question in st.session_state.meeting_questions:
+                st.write(f"• {question}")
+    st.divider()
+    render_todos()
+    st.divider()
+    render_chat(meeting_content, sys_role, audio_query, voice_submitted)
