@@ -33,10 +33,6 @@ def initialize_state() -> None:
         st.session_state.meeting_summary = ""
     if "meeting_questions" not in st.session_state:
         st.session_state.meeting_questions = []
-    if "meeting_followup_history" not in st.session_state:
-        st.session_state.meeting_followup_history = []
-    if "meeting_followup_file_key" not in st.session_state:
-        st.session_state.meeting_followup_file_key = None
     if "analyzed_files" not in st.session_state:
         st.session_state.analyzed_files = set()
 
@@ -52,8 +48,6 @@ def reset_state() -> None:
     st.session_state.meeting_summary = ""
     st.session_state.meeting_questions = []
     st.session_state.analyzed_files.clear()
-    st.session_state.meeting_followup_history = []
-    st.session_state.meeting_followup_file_key = None
     today = korea_today()
     st.session_state.selected_date = today
     st.session_state.calendar_year = today.year

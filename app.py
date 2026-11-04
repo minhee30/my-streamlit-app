@@ -7,7 +7,7 @@ import streamlit as st
 from openai import OpenAI
 
 from app_state import initialize_state, reset_state, save_response
-from assistant import DEFAULT_SYS_ROLE, ask_meeting_followup
+from assistant import ASSISTANT_BUILD, DEFAULT_SYS_ROLE
 from calendar_ui import render_calendar, render_todos
 from command_service import MissingInputError, run_command
 from meeting_planner import analyze_meeting, save_analysis
@@ -19,6 +19,7 @@ initialize_state()
 
 with st.sidebar:
     st.header("🤖 에이블")
+    st.caption(f"메일 처리 버전: {ASSISTANT_BUILD}")
     st.subheader("📥 회의록과 명령")
     uploaded_file = st.file_uploader(
         "회의록 텍스트 파일 (.txt)", type=["txt"],
@@ -38,9 +39,6 @@ with st.sidebar:
             st.text_area("미팅 본문", meeting_content, height=180, disabled=True)
 
         file_key = hashlib.sha256(meeting_content.encode("utf-8")).hexdigest()
-        if st.session_state.meeting_followup_file_key != file_key:
-            st.session_state.meeting_followup_history = []
-            st.session_state.meeting_followup_file_key = file_key
         if file_key not in st.session_state.analyzed_files:
             with st.spinner("회의록에서 일정과 할 일을 분석 중입니다..."):
                 try:
@@ -52,7 +50,7 @@ with st.sidebar:
                     st.success(f"캘린더 {schedule_count}건, To-do {todo_count}건 등록")
 
     st.divider()
-    recipient_email = st.text_input("수신자 이메일 주소", value=os.getenv("GMAIL_ADDRESS", ""))
+    recipient_email = st.text_input("수신자 이메일 주소", value=os.getenv("RECIPIENT_EMAIL", ""))
     with st.expander("에이블 페르소나 (프롬프트)"):
         sys_role = st.text_area("시스템 역할", value=DEFAULT_SYS_ROLE, height=220)
     if st.button("대화 및 일정 초기화", use_container_width=True):
@@ -105,36 +103,6 @@ with summary_column:
         with st.expander("확인 필요한 항목"):
             for question in st.session_state.meeting_questions:
                 st.write(f"• {question}")
-
-    # 회의록 기반 멀티턴 추가 질문 (기존 화면 및 기능 유지)
-    if meeting_content and st.session_state.meeting_summary:
-        st.divider()
-        st.subheader("💬 회의록 추가 질문")
-        for message in st.session_state.meeting_followup_history:
-            with st.chat_message(message["role"]):
-                st.write(message["content"])
-        with st.form("meeting_followup_form", clear_on_submit=True):
-            followup_question = st.text_input("회의록에 대해 질문하세요", key="meeting_followup_question")
-            followup_submit = st.form_submit_button("질문하기")
-        if followup_submit and followup_question.strip():
-            try:
-                with st.spinner("회의록을 참고해 답변하는 중입니다..."):
-                    followup_answer = ask_meeting_followup(
-                        OpenAI(), followup_question, meeting_content,
-                        st.session_state.meeting_summary,
-                        st.session_state.meeting_followup_history,
-                    )
-            except Exception as exc:
-                st.error(f"회의록 추가 질문 오류: {exc}")
-            else:
-                st.session_state.meeting_followup_history.extend([
-                    {"role": "user", "content": followup_question},
-                    {"role": "assistant", "content": followup_answer},
-                ])
-                st.rerun()
-        if st.button("회의록 질문 기록 초기화", key="reset_meeting_followup"):
-            st.session_state.meeting_followup_history = []
-            st.rerun()
 
     st.divider()
     render_todos()
