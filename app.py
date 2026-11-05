@@ -12,8 +12,10 @@ from calendar_ui_v2 import render_calendar, render_details, render_todos
 from command_service import MissingInputError, run_command
 from meeting_planner import analyze_meeting, save_analysis
 from meeting_utils import update_meeting_file
+from ui_theme import ABLE_AVATAR, apply_theme, card, render_hero, render_sidebar_brand
 
-st.set_page_config(page_title="AI 개인비서 에이블",page_icon="🤖",layout="wide")
+st.set_page_config(page_title="AI 개인비서 에이블",page_icon=ABLE_AVATAR,layout="wide")
+apply_theme()   # 에이블 캐릭터 색상(오렌지·민트) 테마
 initialize_state()
 
 
@@ -24,7 +26,7 @@ def get_client():
 
 # 호준님 파일의 사이드바·멀티턴 처리 방식을 유지합니다.
 with st.sidebar:
-    st.header("🤖 에이블")
+    render_sidebar_brand()
     st.caption(f"메일 처리 버전: {ASSISTANT_BUILD}")
     st.subheader("📥 회의록과 명령")
     uploaded_file=st.file_uploader("회의록 텍스트 파일 (.txt)",type=["txt"],key=f"meeting_file_{st.session_state.upload_version}")
@@ -118,47 +120,48 @@ if voice_bytes is not None or submitted:
     st.session_state.voice_notice['command']=notices
     st.rerun()
 
-st.title('🗓️ ABLE 일정 및 업무 관리')
-st.caption('회의록을 업로드하면 일정이 캘린더에 바로 등록되고(회의=파랑, 마감기한=빨강), 오른쪽 위에서 회의 요약이 음성으로 재생됩니다.')
+render_hero()   # 에이블 캐릭터 소개 배너
 
 # 왼쪽 사이드바 / 가운데 넓은 영역 / 오른쪽 좁은 영역
-main,right=st.columns([3.6,1.15],gap='large')
+main,right=st.columns([3.6,1.2],gap='large')
 with right:
-    st.subheader('📋 회의 요약')
-    if st.session_state.summary_audio:
-        # 업로드 직후 한 번만 자동 재생합니다. (이후에는 재생 버튼으로 다시 듣기)
-        st.audio(st.session_state.summary_audio,format='audio/mp3',autoplay=st.session_state.summary_autoplay)
-        st.session_state.summary_autoplay=False
-    if st.session_state.meeting_summary:
-        st.write(st.session_state.meeting_summary)
-    else:
-        st.info('회의록을 업로드하면 요약이 바로 나타나고 음성으로 재생됩니다.')
-    if st.session_state.meeting_questions:
-        with st.expander('확인 필요한 사항'):
-            for question in st.session_state.meeting_questions:
-                st.write('• '+question)
-    st.divider()
-    render_todos(get_client)
+    with card('summary'):
+        st.subheader('📋 회의 요약')
+        if st.session_state.summary_audio:
+            # 업로드 직후 한 번만 자동 재생합니다. (이후에는 재생 버튼으로 다시 듣기)
+            st.audio(st.session_state.summary_audio,format='audio/mp3',autoplay=st.session_state.summary_autoplay)
+            st.session_state.summary_autoplay=False
+        if st.session_state.meeting_summary:
+            st.write(st.session_state.meeting_summary)
+        else:
+            st.info('회의록을 업로드하면 요약이 바로 나타나고 음성으로 재생됩니다.')
+        if st.session_state.meeting_questions:
+            with st.expander('확인 필요한 사항'):
+                for question in st.session_state.meeting_questions:
+                    st.write('• '+question)
+    with card('todo'):
+        render_todos(get_client)
 with main:
-    render_calendar()
-    st.divider()
-    render_details(get_client)
+    with card('calendar'):
+        render_calendar()
+    with card('details'):
+        render_details(get_client)
 
-st.divider()
-st.subheader('💬 에이블의 답변')
-messages=st.session_state.messages
-if messages:
-    # 최신 답변이 위로 오도록 (질문, 답변) 묶음을 역순으로 표시합니다.
-    pairs=[messages[i:i+2] for i in range(0,len(messages),2)]
-    for index,pair in enumerate(reversed(pairs)):
-        if index==0 and st.session_state.audio_bytes:
-            st.audio(st.session_state.audio_bytes,format='audio/mp3')
-        for message in pair:
-            with st.chat_message(message['role']):
-                st.write(message['content'])
-        if index==0 and len(pairs)>1:
-            st.caption('▼ 이전 대화')
-else:
-    st.info('사이드바에서 텍스트 또는 음성 명령을 실행하면 답변이 표시됩니다.')
+with card('answers'):
+    st.subheader('💬 에이블의 답변')
+    messages=st.session_state.messages
+    if messages:
+        # 최신 답변이 위로 오도록 (질문, 답변) 묶음을 역순으로 표시합니다.
+        pairs=[messages[i:i+2] for i in range(0,len(messages),2)]
+        for index,pair in enumerate(reversed(pairs)):
+            if index==0 and st.session_state.audio_bytes:
+                st.audio(st.session_state.audio_bytes,format='audio/mp3')
+            for message in pair:
+                with st.chat_message(message['role'],avatar=ABLE_AVATAR if message['role']=='assistant' else None):
+                    st.write(message['content'])
+            if index==0 and len(pairs)>1:
+                st.caption('▼ 이전 대화')
+    else:
+        st.info('사이드바에서 텍스트 또는 음성 명령을 실행하면 답변이 표시됩니다.')
 
 st.caption('일정·To-do는 현재 접속 세션에만 유지되며 서버 재시작 후 사라질 수 있습니다.')
