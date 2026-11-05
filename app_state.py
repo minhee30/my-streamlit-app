@@ -29,6 +29,7 @@ DEFAULTS = {
     "voice_versions": dict,     # 녹음 위젯 초기화용 키 버전
     "processed_voice": set,     # 이미 처리한 녹음(중복 등록 방지)
     "voice_notice": dict,       # 음성 처리 결과 메시지
+    "voice_pending": dict,      # 등록 전 확인 중인 음성 인식 결과
 }
 
 
@@ -63,6 +64,7 @@ def reset_state() -> None:
     st.session_state.summary_autoplay = False
     st.session_state.processed_voice.clear()
     st.session_state.voice_notice.clear()
+    st.session_state.voice_pending.clear()
     today = korea_today()
     st.session_state.selected_date = today
     st.session_state.calendar_year = today.year
