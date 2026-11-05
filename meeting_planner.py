@@ -9,11 +9,11 @@ import streamlit as st
 
 from app_state import korea_today
 
-# 일정 종류: 회의(파랑) / 마감기한(빨강) / 일반(회색)
+# 일정 종류: 회의(민트) / 마감기한(코랄 레드) / 일반(회색) — 에이블 캐릭터 색상에 맞춤
 SCHEDULE_KINDS = {
-    "meeting": {"label": "회의", "color": "#2563eb"},
-    "deadline": {"label": "마감기한", "color": "#dc2626"},
-    "general": {"label": "일반", "color": "#64748b"},
+    "meeting": {"label": "회의", "color": "#0E8F86", "soft": "#E8FAF7"},
+    "deadline": {"label": "마감기한", "color": "#E0483E", "soft": "#FDECEA"},
+    "general": {"label": "일반", "color": "#64748B", "soft": "#F1F5F9"},
 }
 
 
