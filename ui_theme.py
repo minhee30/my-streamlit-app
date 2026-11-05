@@ -138,8 +138,7 @@ def _data_uri(path):
 
 
 def render_sidebar_brand() -> None:
-    if ABLE_IMAGE:
-        st.image(ABLE_IMAGE, width="stretch")
+    # 사이드바에는 이미지 없이 이름만 표시합니다. (캐릭터는 상단 소개 배너에 표시)
     st.markdown("<div class='able-side-tag'>AI PERSONAL ASSISTANT</div>"
                 "<div class='able-side-name'>에이블 <span>ABLE</span></div>", unsafe_allow_html=True)
 
