@@ -155,7 +155,9 @@ with card('answers'):
         pairs=[messages[i:i+2] for i in range(0,len(messages),2)]
         for index,pair in enumerate(reversed(pairs)):
             if index==0 and st.session_state.audio_bytes:
-                st.audio(st.session_state.audio_bytes,format='audio/mp3')
+                # 새 답변은 한 번 자동 재생합니다. (이후에는 재생 버튼으로 다시 듣기)
+                st.audio(st.session_state.audio_bytes,format='audio/mp3',autoplay=st.session_state.answer_autoplay)
+                st.session_state.answer_autoplay=False
             for message in pair:
                 with st.chat_message(message['role'],avatar=ABLE_AVATAR if message['role']=='assistant' else None):
                     st.write(message['content'])
