@@ -25,6 +25,8 @@ DEFAULTS = {
     # 회의 요약 음성(TTS) 자동 재생
     "summary_audio": lambda: None,
     "summary_autoplay": lambda: False,
+    # 에이블의 답변 음성(TTS) 자동 재생
+    "answer_autoplay": lambda: False,
     # 상세 일정 / To-do 음성 입력(STT)
     "voice_versions": dict,     # 녹음 위젯 초기화용 키 버전
     "processed_voice": set,     # 이미 처리한 녹음(중복 등록 방지)
@@ -62,6 +64,7 @@ def reset_state() -> None:
     st.session_state.analyzed_files.clear()
     st.session_state.summary_audio = None
     st.session_state.summary_autoplay = False
+    st.session_state.answer_autoplay = False
     st.session_state.processed_voice.clear()
     st.session_state.voice_notice.clear()
     st.session_state.voice_pending.clear()
@@ -75,3 +78,5 @@ def save_response(user_prompt: str, answer: str, audio_bytes: bytes | None) -> N
     st.session_state.messages.append({"role": "user", "content": user_prompt})
     st.session_state.messages.append({"role": "assistant", "content": answer})
     st.session_state.audio_bytes = audio_bytes
+    # 새 답변이 생기면 다음 화면에서 음성을 한 번 자동 재생합니다.
+    st.session_state.answer_autoplay = audio_bytes is not None
