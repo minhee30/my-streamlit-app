@@ -40,6 +40,10 @@ def parse_spoken_item(client, spoken: str, mode: str, base_date: str = "") -> di
             "시간은 말한 경우에만 24시간 형식으로 쓰세요. 회의·미팅·발표는 meeting, 마감·제출·기한은 deadline입니다. "
             "'등록해 줘' 같은 명령어는 title에서 빼세요."
         )
+    instruction += (
+        " 입력은 음성 인식 결과라 맞춤법이나 띄어쓰기가 조금 틀릴 수 있습니다. 업무 맥락에 맞게 자연스러운 "
+        "한국어로 바로잡되, 말하지 않은 내용은 지어내지 마세요. 결과는 반드시 한국어로 쓰세요."
+    )
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         response_format={"type": "json_object"},
@@ -61,7 +65,7 @@ def run_command(
     recipient_email: str,
 ) -> CommandResult:
     if audio_query is not None:
-        user_prompt = transcribe_audio(client, audio_query).strip()
+        user_prompt = transcribe_audio(client, audio_query, mode="command").strip()
         if not user_prompt:
             raise MissingInputError("음성을 인식하지 못했습니다. 마이크에 조금 더 가까이 또렷하게 말씀해 주세요.")
     else:
